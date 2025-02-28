@@ -58,6 +58,8 @@ class Mesh : public Dispatcher {
 protected:
   DispatcherAction onRecvPacket(Packet* pkt) override;
 
+  virtual uint32_t getCADFailRetryDelay() const override;
+
   /**
    * \brief  Decide what to do with received packet, ie. discard, forward, or hold
    */
@@ -73,6 +75,11 @@ protected:
    * \returns  number of milliseconds delay to apply to retransmitting the given packet.
    */
   virtual uint32_t getRetransmitDelay(const Packet* packet);
+
+  /**
+   * \returns  number of milliseconds delay to apply to retransmitting the given packet, for DIRECT mode.
+   */
+  virtual uint32_t getDirectRetransmitDelay(const Packet* packet);
 
   /**
    * \brief  Perform search of local DB of peers/contacts.
@@ -126,6 +133,11 @@ protected:
   virtual void onPathRecv(Packet* packet, Identity& sender, uint8_t* path, uint8_t path_len, uint8_t extra_type, uint8_t* extra, uint8_t extra_len) { }
 
   /**
+   * \brief  A packet with PAYLOAD_TYPE_RAW_CUSTOM has been received.
+  */
+  virtual void onRawDataRecv(Packet* packet) { }
+
+  /**
    * \brief  Perform search of local DB of matching GroupChannels.
    * \param  channels  OUT - store matching channels in this array, up to max_matches
    * \returns  Number of channels with matching hash
@@ -169,6 +181,7 @@ public:
   Packet* createAck(uint32_t ack_crc);
   Packet* createPathReturn(const uint8_t* dest_hash, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);
   Packet* createPathReturn(const Identity& dest, const uint8_t* secret, const uint8_t* path, uint8_t path_len, uint8_t extra_type, const uint8_t*extra, size_t extra_len);
+  Packet* createRawData(const uint8_t* data, size_t len);
 
   /**
    * \brief  send a locally-generated Packet with flood routing
