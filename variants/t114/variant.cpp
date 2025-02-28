@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "HeltecT114Board.h"
+#include "variant.h"
 
 const uint32_t g_ADigitalPinMap[] = {
     0xff, 0xff,

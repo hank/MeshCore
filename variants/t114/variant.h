@@ -1,5 +1,4 @@
 #pragma once
-#include <MeshCore.h>
 #include <Arduino.h>
 #define MASTER_CLOCK (64000000ul)
 // 32k Crystal

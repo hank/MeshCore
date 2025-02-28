@@ -80,6 +80,10 @@
   #include <helpers/nrf52/T1000eBoard.h>
   #include <helpers/CustomLR1110Wrapper.h>
   static T1000eBoard board;
+#elif defined(HELTEC_T114)
+  #include <helpers/nrf52/T1000eBoard.h>
+  #include <helpers/CustomLR1110Wrapper.h>
+  static T1000eBoard board;
 #else
   #error "need to provide a 'board' object"
 #endif
