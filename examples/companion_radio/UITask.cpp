@@ -112,7 +112,14 @@ void UITask::renderCurrScreen() {
     _display->setTextSize(1);
 
     _display->setColor(DisplayDriver::LIGHT);
-    _display->print(_node_name);
+    // Space for 11 characters
+    snprintf(tmp, 11, _node_name);
+    _display->print(tmp);
+
+    _display->setCursor(_display->width() - 54, 20);
+    sprintf(tmp, "Batt: %u%%", _battery_pct);
+    _display->print(tmp);
+
     
     _display->setCursor(0, 32);
     _display->print(_version_info);
@@ -209,4 +216,25 @@ void UITask::loop() {
       _display->turnOff();
     }
   }
+}
+
+uint8_t UITask::calculate_battery_percentage(uint16_t millivolts) {
+  // Define battery voltage range
+  const uint16_t BATTERY_MIN_MV = 3000;  // 0% battery
+  const uint16_t BATTERY_MAX_MV = 4200;  // 100% battery
+  const uint16_t BATTERY_RANGE = BATTERY_MAX_MV - BATTERY_MIN_MV;
+  
+  // Constrain input to the valid range
+  if (millivolts < BATTERY_MIN_MV) {
+      return 0;
+  }
+  if (millivolts > BATTERY_MAX_MV) {
+      return 100;
+  }
+  
+  // Calculate percentage
+  uint16_t voltage_above_min = millivolts - BATTERY_MIN_MV;
+  uint8_t percentage = (uint8_t)((voltage_above_min * 100) / BATTERY_RANGE);
+  _battery_pct = percentage;
+  return percentage;
 }

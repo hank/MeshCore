@@ -1421,6 +1421,7 @@ public:
 
   #ifdef HAS_UI
     ui_task.setHasConnection(_serial->isConnected());
+    ui_task.setBatteryLevel(board.getBattMilliVolts());
     ui_task.loop();
   #endif
   }

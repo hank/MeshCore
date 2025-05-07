@@ -16,6 +16,8 @@ class UITask {
   char _msg[80];
   int _msgcount;
   bool _need_refresh = true;
+  uint16_t _battery_mv = 0;
+  uint16_t _battery_pct = 0;
 
   void renderCurrScreen();
   void buttonHandler();
@@ -30,6 +32,11 @@ public:
   void begin(DisplayDriver* display, const char* node_name, const char* build_date, const char* firmware_version, uint32_t pin_code);
 
   void setHasConnection(bool connected) { _connected = connected; }
+  uint8_t calculate_battery_percentage(uint16_t millivolts);
+  void setBatteryLevel(uint16_t millivolts) { 
+    _battery_mv = millivolts; 
+    calculate_battery_percentage(_battery_mv);
+  }
   bool hasDisplay() const { return _display != NULL; }
   void clearMsgPreview();
   void msgRead(int msgcount);
