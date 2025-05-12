@@ -3,6 +3,11 @@
 
 TBeamS3SupremeBoard board;
 
+#ifdef MESH_DEBUG
+void scanDevices(TwoWire *w);
+uint32_t deviceOnline = 0x00;
+#endif
+
 bool pmuIntFlag;
 
 #ifndef LORA_CR
@@ -25,26 +30,6 @@ SensorManager sensors;
 static void setPMUIntFlag(){
   pmuIntFlag = true;
 }
-#ifdef MESH_DEBUG
-void TBeamS3SupremeBoard::printPMU()
-{
-    Serial.print("isCharging:"); Serial.println(PMU.isCharging() ? "YES" : "NO");
-    Serial.print("isDischarge:"); Serial.println(PMU.isDischarge() ? "YES" : "NO");
-    Serial.print("isVbusIn:"); Serial.println(PMU.isVbusIn() ? "YES" : "NO");
-    Serial.print("getBattVoltage:"); Serial.print(PMU.getBattVoltage()); Serial.println("mV");
-    Serial.print("getVbusVoltage:"); Serial.print(PMU.getVbusVoltage()); Serial.println("mV");
-    Serial.print("getSystemVoltage:"); Serial.print(PMU.getSystemVoltage()); Serial.println("mV");
-
-    // The battery percentage may be inaccurate at first use, the PMU will automatically
-    // learn the battery curve and will automatically calibrate the battery percentage
-    // after a charge and discharge cycle
-    if (PMU.isBatteryConnect()) {
-        Serial.print("getBatteryPercent:"); Serial.print(PMU.getBatteryPercent()); Serial.println("%");
-    }
-
-    Serial.println();
-}
-#endif
 
 bool TBeamS3SupremeBoard::power_init()
 {
@@ -88,7 +73,7 @@ bool TBeamS3SupremeBoard::power_init()
   // QMC6310U
   MESH_DEBUG_PRINTLN("Setting and enabling a-ldo2 for QMC");
   PMU.setALDO2Voltage(3300);
-  PMU.enableALDO2(); // disable to save power
+  PMU.enableALDO2();
 
   // SD card
   MESH_DEBUG_PRINTLN("Setting and enabling b-ldo2 for SD card");
@@ -121,7 +106,7 @@ bool TBeamS3SupremeBoard::power_init()
 
   // Set charge current to 300mA
   MESH_DEBUG_PRINTLN("Setting battery charge current limit and voltage");
-  PMU.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_300MA);
+  PMU.setChargerConstantCurr(XPOWERS_AXP2101_CHG_CUR_500MA);
   PMU.setChargeTargetVoltage(XPOWERS_AXP2101_CHG_VOL_4V2);
 
   // enable battery voltage measurement
@@ -140,6 +125,9 @@ bool TBeamS3SupremeBoard::power_init()
   );
 #ifdef MESH_DEBUG
   printPMU();
+  scanDevices(&Wire);
+  scanDevices(&Wire1);
+
 #endif
 
   // Set the power key off press time
@@ -192,3 +180,126 @@ mesh::LocalIdentity radio_new_identity() {
   RadioNoiseListener rng(radio);
   return mesh::LocalIdentity(&rng);  // create new random identity
 }
+
+// BME280
+bool TBeamS3SupremeBoard::bme_init()
+{
+  bool status;
+  status = bme.begin(I2C_BME280_ADD, BME_WIRE_PORT_ADDR);
+  if (!status)
+  {
+    MESH_DEBUG_PRINTLN("Could not find a valid BME280 sensor, check wiring!");
+  }
+  else
+  {
+#ifdef MESH_DEBUG
+    bme_debug();
+#endif
+  }
+  return status;
+}
+
+#ifdef MESH_DEBUG
+void TBeamS3SupremeBoard::printPMU()
+{
+    Serial.print("isCharging:"); Serial.println(PMU.isCharging() ? "YES" : "NO");
+    Serial.print("isDischarge:"); Serial.println(PMU.isDischarge() ? "YES" : "NO");
+    Serial.print("isVbusIn:"); Serial.println(PMU.isVbusIn() ? "YES" : "NO");
+    Serial.print("getBattVoltage:"); Serial.print(PMU.getBattVoltage()); Serial.println("mV");
+    Serial.print("getVbusVoltage:"); Serial.print(PMU.getVbusVoltage()); Serial.println("mV");
+    Serial.print("getSystemVoltage:"); Serial.print(PMU.getSystemVoltage()); Serial.println("mV");
+
+    // The battery percentage may be inaccurate at first use, the PMU will automatically
+    // learn the battery curve and will automatically calibrate the battery percentage
+    // after a charge and discharge cycle
+    if (PMU.isBatteryConnect()) {
+        Serial.print("getBatteryPercent:"); Serial.print(PMU.getBatteryPercent()); Serial.println("%");
+    }
+
+    Serial.println();
+}
+
+void TBeamS3SupremeBoard::bme_debug()
+{
+  MESH_DEBUG_PRINTLN("Humidity: %10.1f", humidity());
+  MESH_DEBUG_PRINTLN("Pressure: %10.1f\n", pressure());
+  MESH_DEBUG_PRINTLN("Temperature: %10.1f\n", temperature());
+}
+
+enum {
+    POWERMANAGE_ONLINE  = _BV(0),
+    DISPLAY_ONLINE      = _BV(1),
+    RADIO_ONLINE        = _BV(2),
+    GPS_ONLINE          = _BV(3),
+    PSRAM_ONLINE        = _BV(4),
+    SDCARD_ONLINE       = _BV(5),
+    AXDL345_ONLINE      = _BV(6),
+    BME280_ONLINE       = _BV(7),
+    BMP280_ONLINE       = _BV(8),
+    BME680_ONLINE       = _BV(9),
+    QMC6310_ONLINE      = _BV(10),
+    QMI8658_ONLINE      = _BV(11),
+    PCF8563_ONLINE      = _BV(12),
+    OSC32768_ONLINE      = _BV(13),
+};
+
+void scanDevices(TwoWire *w)
+{
+    uint8_t err, addr;
+    int nDevices = 0;
+    uint32_t start = 0;
+
+    Serial.println("I2C Devices scanning");
+    for (addr = 1; addr < 127; addr++) {
+        start = millis();
+        w->beginTransmission(addr); delay(2);
+        err = w->endTransmission();
+        if (err == 0) {
+            nDevices++;
+            switch (addr) {
+            case 0x77:
+            case 0x76:
+                Serial.println("\tFind BMX280 Sensor!");
+                deviceOnline |= BME280_ONLINE;
+                break;
+            case 0x34:
+                Serial.println("\tFind AXP192/AXP2101 PMU!");
+                deviceOnline |= POWERMANAGE_ONLINE;
+                break;
+            case 0x3C:
+                Serial.println("\tFind SSD1306/SH1106 dispaly!");
+                deviceOnline |= DISPLAY_ONLINE;
+                break;
+            case 0x51:
+                Serial.println("\tFind PCF8563 RTC!");
+                deviceOnline |= PCF8563_ONLINE;
+                break;
+            case 0x1C:
+                Serial.println("\tFind QMC6310 MAG Sensor!");
+                deviceOnline |= QMC6310_ONLINE;
+                break;
+            default:
+                Serial.print("\tI2C device found at address 0x");
+                if (addr < 16) {
+                    Serial.print("0");
+                }
+                Serial.print(addr, HEX);
+                Serial.println(" !");
+                break;
+            }
+
+        } else if (err == 4) {
+            Serial.print("Unknow error at address 0x");
+            if (addr < 16) {
+                Serial.print("0");
+            }
+            Serial.println(addr, HEX);
+        }
+    }
+    if (nDevices == 0)
+        Serial.println("No I2C devices found\n");
+
+    Serial.println("Scan devices done.");
+    Serial.println("\n");
+}
+#endif
